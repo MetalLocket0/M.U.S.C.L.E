@@ -1,15 +1,13 @@
-// MPU-6050 + TCA9548A
-// Modifications by Francisco Sanchez
-// November, 2019
-// Public Domain
 #include<Wire.h>
 #include <SD.h>
 #include <SPI.h>
+#include <OneWire.h>
+#include <DallasTemperature.h>
+#include <DS3231.h>
+
 #define TCAADDR 0x70
 
 // Temperature
-#include <OneWire.h>
-#include <DallasTemperature.h>
 #define ONE_WIRE_BUS 5
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensors(&oneWire);
@@ -17,12 +15,32 @@ float Celcius = 0;
 float Fahrenheit = 0;
 
 //clock
-#include <ds3231.h>
-struct ts t;
+DS3231 clock1;
+byte year;
+byte month;
+byte date;
+byte dOW;
+byte hour;
+byte minute;
+byte second;
+bool h12Flag = false;
+bool century = false;
 
-//multiplexer
+//SD Card
 const byte chipSelect = 10;
 String dataString;
+
+//pH
+const int analogInPin = A0;
+int sensorValue = 0;
+unsigned long int avgValue;
+float b;
+int buf[10], temp;
+
+//Example for Port 0 out of 8 available ports (0 to 7) and mpu6050 variables
+const int MPU_addr = 0x68; // I2C address of the MPU-6050
+int16_t AcX, AcY, AcZ, Tmp, GyX, GyY, GyZ;
+
 void tcaselect(uint8_t i)
 {
   if (i > 7) return;
@@ -50,9 +68,6 @@ void writeToCard(int16_t AcX, int16_t AcY, int16_t AcZ, int16_t Tmp, int16_t GyX
 
 }
 
-//Example for Port 0 out of 8 available ports (0 to 7)
-const int MPU_addr = 0x68; // I2C address of the MPU-6050
-int16_t AcX, AcY, AcZ, Tmp, GyX, GyY, GyZ;
 
 void setup()
 {
@@ -62,14 +77,14 @@ void setup()
   sensors.begin();
 
   //Clock Module
-  DS3231_init(0);
-  t.hour = 8;
-  t.min = 52;
-  t.sec = 20;
-  t.mday = 16;
-  t.mon = 12;
-  t.year = 2021;
-  DS3231_set(t);
+  clock1.setClockMode(h12Flag);  // set to 24h
+  clock1.setYear(year);
+  clock1.setMonth(month);
+  clock1.setDate(date);
+  clock1.setDoW(dOW);
+  clock1.setHour(hour);
+  clock1.setMinute(minute);
+  clock1.setSecond(second);
 
   /*Serial.print("Initializing SD card...");
     pinMode(10, OUTPUT); // change this to 53 on a mega  // don't follow this!!
@@ -147,18 +162,23 @@ void loop() {
   delay(1000);
 
   //Clock Module
-  DS3231_get(&t);
-  Serial.print("Date : ");
-  Serial.print(t.mday);
-  Serial.print("/");
-  Serial.print(t.mon);
-  Serial.print("/");
-  Serial.print(t.year);
-  Serial.print("\t Hour : ");
-  Serial.print(t.hour);
-  Serial.print(":");
-  Serial.print(t.min);
-  Serial.print(".");
-  Serial.println(t.sec);
-  delay(1000);
+  Serial.print(clock.getYear(), DEC);
+  Serial.print(' ');
+
+  // then the month
+  Serial.print(clock.getMonth(century), DEC);
+  Serial.print(" ");
+
+  // then the date
+  Serial.print(clock.getDate(), DEC);
+  Serial.print(" ");
+  // and the day of the week
+  Serial.print(clock.getDoW(), DEC);
+  Serial.print(" ");
+  // Finally the hour, minute, and second
+  Serial.print(clock.getHour(h12Flag, pmFlag), DEC);
+  Serial.print(" ");
+  Serial.print(clock.getMinute(), DEC);
+  Serial.print(" ");
+  Serial.print(clock.getSecond(), DEC);
 }
